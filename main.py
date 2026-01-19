@@ -1,25 +1,26 @@
 from fastapi import FastAPI
 from pydantic import BaseModel
-from model import generate_summary
-from fastapi.middleware.cors import CORSMiddleware
+from transformers import pipeline
+import os
 
 app = FastAPI()
 
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+# Load model (fast + stable)
+summarizer = pipeline("summarization", model="sshleifer/distilbart-cnn-12-6")
 
 class TextInput(BaseModel):
     text: str
 
-@app.post("/summarize")
-async def summarize(data: TextInput):
-    summary = generate_summary(data.text)
-    return {"summary": summary}
-
 @app.get("/")
 def home():
     return {"status": "Summarizer API Running"}
+
+@app.post("/summarize")
+def summarize(data: TextInput):
+    result = summarizer(data.text, max_length=150, min_length=60, do_sample=False)
+    return {"summary": result[0]["summary_text"]}
+
+if __name__ == "__main__":
+    import uvicorn
+    port = int(os.environ.get("PORT", 8000))
+    uvicorn.run(app, host="0.0.0.0", port=port)
